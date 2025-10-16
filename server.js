@@ -15,9 +15,10 @@ const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 const passportSocketIo = require("passport.socketio");
 const cookieParser = require("cookie-parser");
-const MongoStore = require("connect-mongo")(session);
-const URI = process.env.MONGO_URI;
-const store = new MongoStore({ url: URI });
+
+// SỬA Ở ĐÂY: Thay đổi cách require và khởi tạo MongoStore
+const MongoStore = require("connect-mongo");
+const store = MongoStore.create({ mongoUrl: process.env.MONGO_URI });
 
 // Configure Pug as the template engine
 app.set("view engine", "pug");
@@ -29,6 +30,22 @@ app.use("/public", express.static(process.cwd() + "/public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// SỬA Ở ĐÂY: Thêm 'store' vào cấu hình session
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: true,
+    saveUninitialized: true,
+    cookie: { secure: false },
+    store: store, // Đảm bảo session được lưu vào MongoDB
+    key: "express.sid" // Thêm key này để passportSocketIo hoạt động
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// io.use() phải được đặt sau khi app.use(session(...))
 io.use(
   passportSocketIo.authorize({
     cookieParser: cookieParser,
