@@ -16,48 +16,48 @@ const io = require("socket.io")(http);
 const passportSocketIo = require("passport.socketio");
 const cookieParser = require("cookie-parser");
 
-// SỬA Ở ĐÂY: Thay đổi cách require và khởi tạo MongoStore
+// SỬA: Sử dụng đúng cú pháp cho connect-mongo
 const MongoStore = require("connect-mongo");
-const store = MongoStore.create({ mongoUrl: process.env.MONGO_URI });
 
 // Configure Pug as the template engine
 app.set("view engine", "pug");
 app.set("views", "./views/pug");
 
-app.use(cors({ origin: "*" })); // Enable CORS for all origins
-fccTesting(app); // For FCC testing purposes
+app.use(cors({ origin: "*" }));
+fccTesting(app);
 app.use("/public", express.static(process.cwd() + "/public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// io.use() phải được đặt sau khi app.use(session(...))
-io.use(
-  passportSocketIo.authorize({
-    cookieParser: cookieParser,
-    key: "express.sid",
-    secret: process.env.SESSION_SECRET,
-    store: store,
-    success: onAuthorizeSuccess,
-    fail: onAuthorizeFail,
-  })
-);
-
+// QUAN TRỌNG: Di chuyển session middleware lên TRƯỚC io.use()
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
     resave: true,
     saveUninitialized: true,
     cookie: { secure: false },
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }) // Thêm store vào session
   })
 );
 
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Bây giờ mới cấu hình socket.io
+io.use(
+  passportSocketIo.authorize({
+    cookieParser: cookieParser,
+    key: "express.sid",
+    secret: process.env.SESSION_SECRET,
+    store: app._router.stack.find(layer => layer.name === 'session').handle.store, // Lấy store từ session middleware
+    success: onAuthorizeSuccess,
+    fail: onAuthorizeFail,
+  })
+);
+
 myDB(async (client) => {
   const myDataBase = await client.db("database").collection("users");
 
-  // Be sure to change the title
   routes(app, myDataBase);
   auth(app, myDataBase);
 
@@ -96,7 +96,6 @@ myDB(async (client) => {
 
 function onAuthorizeSuccess(data, accept) {
   console.log("successful connection to socket.io");
-
   accept(null, true);
 }
 
