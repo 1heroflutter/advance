@@ -30,21 +30,6 @@ app.use("/public", express.static(process.cwd() + "/public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// SỬA Ở ĐÂY: Thêm 'store' vào cấu hình session
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: true,
-    saveUninitialized: true,
-    cookie: { secure: false },
-    store: store, // Đảm bảo session được lưu vào MongoDB
-    key: "express.sid" // Thêm key này để passportSocketIo hoạt động
-  })
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
-
 // io.use() phải được đặt sau khi app.use(session(...))
 io.use(
   passportSocketIo.authorize({
